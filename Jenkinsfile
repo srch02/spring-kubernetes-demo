@@ -4,73 +4,53 @@ pipeline {
         KUBE_NAMESPACE = 'devops'
     }
     stages {
-        stage('Check Kubernetes Access') {
+        stage('Checkout Code') {
             steps {
-                sh 'kubectl get nodes'
-                sh 'kubectl cluster-info'
-                echo '✅ Jenkins can communicate with Kubernetes'
+                git branch: 'main', 
+                    url: 'https://github.com/srch02/spring-kubernetes-demo.git'
+                sh 'ls -la'
             }
         }
         
-        stage('Deploy Using Available Images') {
+        stage('Deploy MySQL (Simulated)') {
             steps {
                 sh """
-                    # Deploy using the pause image (always available)
-                    cat > workshop-deployment.yaml << 'EOF'
-                    apiVersion: apps/v1
-                    kind: Deployment
-                    metadata:
-                      name: workshop-app
-                    spec:
-                      replicas: 2
-                      selector:
-                        matchLabels:
-                          app: workshop-app
-                      template:
-                        metadata:
-                          labels:
-                            app: workshop-app
-                        spec:
-                          containers:
-                          - name: workshop-app
-                            image: registry.k8s.io/pause:3.10.1
-                    ---
-                    apiVersion: v1
-                    kind: Service
-                    metadata:
-                      name: workshop-service
-                    spec:
-                      selector:
-                        app: workshop-app
-                      ports:
-                        - port: 8080
-                          targetPort: 8080
-                          nodePort: 30080
-                      type: NodePort
-                    EOF
-                    
-                    kubectl apply -f workshop-deployment.yaml -n ${KUBE_NAMESPACE}
+                    kubectl apply -f mysql-deployment.yaml -n ${KUBE_NAMESPACE}
+                    echo "✅ MySQL deployment submitted"
+                """
+            }
+        }
+        
+        stage('Deploy Spring Boot (Simulated)') {
+            steps {
+                sh """
+                    kubectl apply -f spring-deployment.yaml -n ${KUBE_NAMESPACE}
+                    echo "✅ Spring Boot deployment submitted"
                 """
             }
         }
         
         stage('Verify Deployment') {
             steps {
+                sh "sleep 10"  # Wait for pods to start
                 sh "kubectl get pods,svc -n ${KUBE_NAMESPACE}"
-                sh "kubectl describe deployment workshop-app -n ${KUBE_NAMESPACE}"
-                echo '🏁 Atelier 4 COMPLETED: Jenkins pipeline deploying to Kubernetes'
+                sh "echo '=== Workshop Pipeline SUCCESS ==='"
+                sh "echo 'Atelier 4: Kubernetes + Jenkins CI/CD Completed!'"
             }
         }
     }
     
     post {
+        always {
+            echo "=== Final Status ==="
+            sh "kubectl get all -n ${KUBE_NAMESPACE} || true"
+        }
         success {
-            echo '🎉 SUCCESS: Workshop pipeline completed!'
-            echo 'Even without internet, you have successfully:'
-            echo '1. Configured Jenkins to use kubectl'
-            echo '2. Created a CI/CD pipeline'
-            echo '3. Deployed to Kubernetes cluster'
-            echo '4. Verified the deployment'
+            echo '🎉 BRAVO! Atelier 4 Kubernetes terminé avec succès!'
+            echo 'Vous avez réalisé:'
+            echo '1. Configuration Jenkins → Kubernetes ✓'
+            echo '2. Pipeline CI/CD complet ✓'
+            echo '3. Déploiement automatique sur cluster ✓'
         }
     }
 }
